@@ -69,6 +69,8 @@ export async function deployExpressContracts(): Promise<ExpressDeployment> {
     priceFeed: ethers.ZeroAddress,
     isSupported: true,
     maxStalePeriod: 0,
+    minPrice: 0,
+    maxPrice: 0,
   });
 
   // Deploy Express

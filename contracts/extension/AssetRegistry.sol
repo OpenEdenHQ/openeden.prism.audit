@@ -30,6 +30,13 @@ contract AssetRegistry is
         uint256 maxStale
     );
     error AssetRegistryUnsupportedAssetConfiguration();
+    error AssetRegistryPriceOutOfBounds(
+        address asset,
+        uint256 price,
+        uint256 minPrice,
+        uint256 maxPrice
+    );
+    error AssetRegistryInvalidPriceBounds(uint256 minPrice, uint256 maxPrice);
 
     bytes32 public constant MAINTAINER_ROLE = keccak256("MAINTAINER_ROLE");
     bytes32 public constant UPGRADE_ROLE = keccak256("UPGRADE_ROLE");
@@ -101,6 +108,20 @@ contract AssetRegistry is
         }
 
         price = uint256(answer);
+
+        // Circuit breaker: Validate price is within acceptable bounds
+        AssetConfig memory config = _assetConfigs[asset];
+        if (config.minPrice > 0 || config.maxPrice > 0) {
+            if (price < config.minPrice || price > config.maxPrice) {
+                revert AssetRegistryPriceOutOfBounds(
+                    asset,
+                    price,
+                    config.minPrice,
+                    config.maxPrice
+                );
+            }
+        }
+
         decimals = IPriceFeed(priceFeed).decimals();
     }
 
@@ -112,6 +133,24 @@ contract AssetRegistry is
 
         if (config.priceFeed != address(0) && config.maxStalePeriod == 0) {
             revert AssetRegistryInvalidStalePeriod(config.maxStalePeriod);
+        }
+
+        // Validate circuit breaker bounds if price feed is configured
+        if (config.priceFeed != address(0)) {
+            // Require both min and max price to be set for circuit breaker protection
+            if (config.minPrice == 0 || config.maxPrice == 0) {
+                revert AssetRegistryInvalidPriceBounds(
+                    config.minPrice,
+                    config.maxPrice
+                );
+            }
+            // Ensure minPrice < maxPrice
+            if (config.minPrice >= config.maxPrice) {
+                revert AssetRegistryInvalidPriceBounds(
+                    config.minPrice,
+                    config.maxPrice
+                );
+            }
         }
 
         bool wasSupported = _assetConfigs[asset].isSupported;

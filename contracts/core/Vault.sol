@@ -204,9 +204,15 @@ contract Vault is
     }
 
     function _stake(address _user, uint256 _amount) internal returns (uint256) {
-        address user = msg.sender;
-        if (lastActionBlock[user] == block.number) revert FlashLoanDetected();
-        lastActionBlock[user] = block.number;
+        address sender = msg.sender;
+
+        // Check flash loan protection for both sender and recipient
+        if (lastActionBlock[sender] == block.number) revert FlashLoanDetected();
+        if (lastActionBlock[_user] == block.number) revert FlashLoanDetected();
+
+        // Update last action block for both sender and recipient
+        lastActionBlock[sender] = block.number;
+        lastActionBlock[_user] = block.number;
 
         uint256 shares = super.deposit(_amount, _user);
         emit Staked(_user, _amount, shares);
@@ -218,7 +224,6 @@ contract Vault is
         uint256 _shares
     ) internal returns (uint256) {
         if (lastActionBlock[_user] == block.number) revert FlashLoanDetected();
-        lastActionBlock[_user] = block.number;
         lastActionBlock[_user] = block.number;
 
         uint256 assets = super.redeem(_shares, redemptionQueue, _user);

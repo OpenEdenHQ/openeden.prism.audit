@@ -81,6 +81,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -117,6 +119,8 @@ describe("AssetRegistry", function () {
           asset: await usdc.getAddress(),
           priceFeed: await priceFeed.getAddress(),
           maxStalePeriod: 3600, // 1 hour
+          minPrice: 1,
+          maxPrice: ethers.parseUnits("1000000", 8),
           isSupported: true,
         };
 
@@ -136,6 +140,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -143,6 +149,8 @@ describe("AssetRegistry", function () {
           asset: await usdc.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -162,6 +170,8 @@ describe("AssetRegistry", function () {
           asset: ethers.ZeroAddress,
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -180,6 +190,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: admin.address, // Non-zero price feed
           maxStalePeriod: 0, // Invalid: should be > 0 when price feed is set
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -198,6 +210,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: false, // Should revert for new asset
         };
 
@@ -216,6 +230,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -236,6 +252,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -250,6 +268,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: await priceFeed.getAddress(),
           maxStalePeriod: 7200, // 2 hours
+          minPrice: 1,
+          maxPrice: ethers.parseUnits("1000000", 8),
           isSupported: true,
         };
 
@@ -260,6 +280,8 @@ describe("AssetRegistry", function () {
             updatedConfig.isSupported,
             await priceFeed.getAddress(),
             updatedConfig.maxStalePeriod,
+            updatedConfig.minPrice,
+            updatedConfig.maxPrice,
           ]);
 
         const storedConfig = await assetRegistry.getAssetConfig(
@@ -276,6 +298,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -295,6 +319,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -334,18 +360,24 @@ describe("AssetRegistry", function () {
             asset: await usdo.getAddress(),
             priceFeed: ethers.ZeroAddress,
             maxStalePeriod: 0,
+            minPrice: 0,
+            maxPrice: 0,
             isSupported: true,
           },
           {
             asset: await usdc.getAddress(),
             priceFeed: ethers.ZeroAddress,
             maxStalePeriod: 0,
+            minPrice: 0,
+            maxPrice: 0,
             isSupported: true,
           },
           {
             asset: await wbtc.getAddress(),
             priceFeed: ethers.ZeroAddress,
             maxStalePeriod: 0,
+            minPrice: 0,
+            maxPrice: 0,
             isSupported: true,
           },
         ];
@@ -372,6 +404,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -396,6 +430,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -417,6 +453,8 @@ describe("AssetRegistry", function () {
           asset: await usdc.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -438,6 +476,8 @@ describe("AssetRegistry", function () {
           asset: await wbtc.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -459,6 +499,8 @@ describe("AssetRegistry", function () {
           asset: await usdc.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -480,6 +522,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -501,6 +545,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -522,6 +568,8 @@ describe("AssetRegistry", function () {
           asset: await usdo.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -573,6 +621,8 @@ describe("AssetRegistry", function () {
         asset: await usdo.getAddress(),
         priceFeed: ethers.ZeroAddress,
         maxStalePeriod: 0,
+        minPrice: 0,
+        maxPrice: 0,
         isSupported: true,
       };
 
@@ -607,6 +657,8 @@ describe("AssetRegistry", function () {
         asset: await usdo.getAddress(),
         priceFeed: ethers.ZeroAddress,
         maxStalePeriod: 0,
+        minPrice: 0,
+        maxPrice: 0,
         isSupported: true,
       };
 
@@ -626,6 +678,8 @@ describe("AssetRegistry", function () {
         asset: await usdo.getAddress(),
         priceFeed: ethers.ZeroAddress,
         maxStalePeriod: 0,
+        minPrice: 0,
+        maxPrice: 0,
         isSupported: true,
       };
 
@@ -633,6 +687,8 @@ describe("AssetRegistry", function () {
         asset: await usdc.getAddress(),
         priceFeed: ethers.ZeroAddress,
         maxStalePeriod: 0,
+        minPrice: 0,
+        maxPrice: 0,
         isSupported: true,
       };
 
@@ -668,6 +724,8 @@ describe("AssetRegistry", function () {
         asset: await usdo.getAddress(),
         priceFeed: ethers.ZeroAddress,
         maxStalePeriod: 0,
+        minPrice: 0,
+        maxPrice: 0,
         isSupported: true,
       };
 
@@ -711,6 +769,8 @@ describe("AssetRegistry", function () {
         asset: await usdo.getAddress(),
         priceFeed: ethers.ZeroAddress,
         maxStalePeriod: 0,
+        minPrice: 0,
+        maxPrice: 0,
         isSupported: true,
       };
 
@@ -744,6 +804,8 @@ describe("AssetRegistry", function () {
           asset: await token.getAddress(),
           priceFeed: ethers.ZeroAddress,
           maxStalePeriod: 0,
+          minPrice: 0,
+          maxPrice: 0,
           isSupported: true,
         };
 
@@ -763,6 +825,8 @@ describe("AssetRegistry", function () {
         asset: await usdo.getAddress(),
         priceFeed: ethers.ZeroAddress,
         maxStalePeriod: 0,
+        minPrice: 0,
+        maxPrice: 0,
         isSupported: true,
       };
 

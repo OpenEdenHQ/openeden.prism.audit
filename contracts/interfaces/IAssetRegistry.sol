@@ -11,6 +11,8 @@ interface IAssetRegistry {
         bool isSupported;
         address priceFeed; // Optional: IPriceFeed contract for price conversion (like TBILL)
         uint256 maxStalePeriod; // Maximum staleness period for this asset's price feed (in seconds)
+        uint256 minPrice; // Minimum acceptable price from oracle (circuit breaker lower bound)
+        uint256 maxPrice; // Maximum acceptable price from oracle (circuit breaker upper bound)
     }
 
     /**

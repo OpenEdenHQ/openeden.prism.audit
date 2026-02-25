@@ -62,6 +62,7 @@ contract Express is
     //////////////////////////////////////////////////////////////*/
 
     uint256 private constant BPS_BASE = 1e4;
+    uint256 private constant PRICE_BASE = 1e8;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
@@ -264,6 +265,7 @@ contract Express is
      * @param _rate The new fee rate in basis points
      */
     function updateMintFee(uint256 _rate) external onlyRole(MAINTAINER_ROLE) {
+        if (_rate > BPS_BASE) revert InvalidInput(_rate);
         mintFeeRate = _rate;
         emit UpdateMintFeeRate(_rate);
     }
@@ -273,6 +275,7 @@ contract Express is
      * @param _rate The new fee rate in basis points
      */
     function updateRedeemFee(uint256 _rate) external onlyRole(MAINTAINER_ROLE) {
+        if (_rate > BPS_BASE) revert InvalidInput(_rate);
         redeemFeeRate = _rate;
         emit UpdateRedeemFeeRate(_rate);
     }
@@ -385,6 +388,8 @@ contract Express is
         address from = _msgSender();
         if (!kycList[from] || !kycList[_to]) revert NotInKycList(from, _to);
         if (_amount == 0) revert InvalidAmount();
+        if (_amount < _redeemMinimum)
+            revert RedeemLessThanMinimum(_amount, _redeemMinimum);
 
         IERC20(address(token)).safeTransferFrom(from, address(this), _amount);
         redemptionInfo[_to] += _amount;
@@ -422,12 +427,37 @@ contract Express is
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Process redemption queue
+     * @notice Process redemption queue at 1:1 price
      * @param _len Number of redemptions to process (0 = process all)
      */
     function processRedemptionQueue(
         uint256 _len
     ) external onlyRole(OPERATOR_ROLE) {
+        _processRedemptionQueueInternal(_len, PRICE_BASE);
+    }
+
+    /**
+     * @notice Process redemption queue with a custom price
+     * @param _len Number of redemptions to process (0 = process all)
+     * @param _price Price multiplier in 8 decimals (1e8 = 1.0)
+     */
+    function processRedemptionQueueWithPrice(
+        uint256 _len,
+        uint256 _price
+    ) external onlyRole(MAINTAINER_ROLE) {
+        if (_price >= PRICE_BASE || _price == 0) revert InvalidAmount();
+        _processRedemptionQueueInternal(_len, _price);
+    }
+
+    /**
+     * @notice Internal function to process redemption queue with price scaling
+     * @param _len Number of redemptions to process (0 = process all)
+     * @param _price Price multiplier in 8 decimals (1e8 = 1.0)
+     */
+    function _processRedemptionQueueInternal(
+        uint256 _len,
+        uint256 _price
+    ) private {
         uint256 length = redemptionQueue.length();
         if (length == 0) revert EmptyQueue();
         if (_len > length) revert InvalidInput(_len);
@@ -445,7 +475,8 @@ contract Express is
             if (!kycList[sender] || !kycList[receiver])
                 revert NotInKycList(sender, receiver);
 
-            uint256 underlyingAmt = convertToUnderlying(underlying, amount);
+            uint256 underlyingAmt = convertToUnderlying(underlying, amount)
+                .mulDiv(_price, PRICE_BASE);
 
             uint256 availableLiquidity = getTokenBalance(address(underlying));
 

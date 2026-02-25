@@ -851,6 +851,552 @@ describe("Express", function () {
     });
   });
 
+  describe("Process Redemption Queue With Price", function () {
+    async function setupRedemptionQueueForPrice() {
+      const fixture = await deployFixture();
+      const { express, oem, usdo, user1, user2 } = fixture;
+
+      // Mint OEM to users
+      await express
+        .connect(user1)
+        .instantMint(
+          await usdo.getAddress(),
+          user1.address,
+          ethers.parseUnits("2000", 18),
+          0,
+        );
+      await express
+        .connect(user2)
+        .instantMint(
+          await usdo.getAddress(),
+          user2.address,
+          ethers.parseUnits("2000", 18),
+          0,
+        );
+
+      // Queue redemptions
+      await oem
+        .connect(user1)
+        .approve(await express.getAddress(), ethers.parseUnits("1000", 18));
+      await oem
+        .connect(user2)
+        .approve(await express.getAddress(), ethers.parseUnits("1000", 18));
+
+      await express
+        .connect(user1)
+        .redeemRequest(user1.address, ethers.parseUnits("500", 18));
+      await express
+        .connect(user2)
+        .redeemRequest(user2.address, ethers.parseUnits("600", 18));
+
+      return fixture;
+    }
+
+    describe("Success Cases", function () {
+      it("should process redemption with 90% price (0.9)", async function () {
+        const { express, usdo, user1, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 90000000n; // 0.9 * 1e8
+        const userBalanceBefore = await usdo.balanceOf(user1.address);
+
+        await expect(
+          express.connect(maintainer).processRedemptionQueueWithPrice(1, price),
+        ).to.emit(express, "ProcessRedeem");
+
+        // User should receive 90% of their redemption amount
+        const userBalanceAfter = await usdo.balanceOf(user1.address);
+        const received = userBalanceAfter - userBalanceBefore;
+
+        // Expected: 500 OEM * 0.9 = 450 USDO
+        expect(received).to.equal(ethers.parseUnits("450", 18));
+        expect(await express.getRedemptionQueueLength()).to.equal(1);
+      });
+
+      it("should process redemption with 50% price (0.5)", async function () {
+        const { express, usdo, user1, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 50000000n; // 0.5 * 1e8
+        const userBalanceBefore = await usdo.balanceOf(user1.address);
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+
+        const userBalanceAfter = await usdo.balanceOf(user1.address);
+        const received = userBalanceAfter - userBalanceBefore;
+
+        // Expected: 500 OEM * 0.5 = 250 USDO
+        expect(received).to.equal(ethers.parseUnits("250", 18));
+      });
+
+      it("should process redemption with 1% price (0.01)", async function () {
+        const { express, usdo, user1, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 1000000n; // 0.01 * 1e8
+        const userBalanceBefore = await usdo.balanceOf(user1.address);
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+
+        const userBalanceAfter = await usdo.balanceOf(user1.address);
+        const received = userBalanceAfter - userBalanceBefore;
+
+        // Expected: 500 OEM * 0.01 = 5 USDO
+        expect(received).to.equal(ethers.parseUnits("5", 18));
+      });
+
+      it("should process redemption with price = 1 (minimum price)", async function () {
+        const { express, usdo, user1, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 1n;
+        const userBalanceBefore = await usdo.balanceOf(user1.address);
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+
+        const userBalanceAfter = await usdo.balanceOf(user1.address);
+        const received = userBalanceAfter - userBalanceBefore;
+
+        // Very small amount
+        expect(received).to.be.gt(0);
+      });
+
+      it("should process all redemptions with custom price when _len is 0", async function () {
+        const { express, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 80000000n; // 0.8 * 1e8
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(0, price);
+
+        expect(await express.getRedemptionQueueLength()).to.equal(0);
+      });
+
+      it("should process multiple redemptions with custom price", async function () {
+        const { express, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 75000000n; // 0.75 * 1e8
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(2, price);
+
+        expect(await express.getRedemptionQueueLength()).to.equal(0);
+      });
+
+      it("should burn OEM correctly with custom price", async function () {
+        const { express, oem, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 60000000n; // 0.6 * 1e8
+        const supplyBefore = await oem.totalSupply();
+        const expectedBurn = ethers.parseUnits("1100", 18); // 500 + 600 OEM burned
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(0, price);
+
+        // OEM should still be burned at full amount, only USDO payout is adjusted
+        expect(await oem.totalSupply()).to.equal(supplyBefore - expectedBurn);
+      });
+
+      it("should distribute reduced USDO amounts based on price", async function () {
+        const { express, usdo, user1, user2, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 70000000n; // 0.7 * 1e8
+
+        const user1BalanceBefore = await usdo.balanceOf(user1.address);
+        const user2BalanceBefore = await usdo.balanceOf(user2.address);
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(0, price);
+
+        const user1BalanceAfter = await usdo.balanceOf(user1.address);
+        const user2BalanceAfter = await usdo.balanceOf(user2.address);
+
+        // User1 should receive ~350 USDO (500 * 0.7)
+        // User2 should receive ~420 USDO (600 * 0.7)
+        expect(user1BalanceAfter - user1BalanceBefore).to.equal(
+          ethers.parseUnits("350", 18),
+        );
+        expect(user2BalanceAfter - user2BalanceBefore).to.equal(
+          ethers.parseUnits("420", 18),
+        );
+      });
+
+      it("should apply fees correctly with custom price", async function () {
+        const { express, usdo, user1, feeTo, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        // Set 10% redeem fee
+        await express.connect(maintainer).updateRedeemFee(1000);
+
+        const price = 80000000n; // 0.8 * 1e8
+
+        const feeToBalanceBefore = await usdo.balanceOf(feeTo.address);
+        const user1BalanceBefore = await usdo.balanceOf(user1.address);
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+
+        const feeToBalanceAfter = await usdo.balanceOf(feeTo.address);
+        const user1BalanceAfter = await usdo.balanceOf(user1.address);
+
+        // Amount after price adjustment: 500 * 0.8 = 400 USDO
+        // Fee: 400 * 0.1 = 40 USDO
+        // User receives: 400 - 40 = 360 USDO
+        const feeReceived = feeToBalanceAfter - feeToBalanceBefore;
+        const userReceived = user1BalanceAfter - user1BalanceBefore;
+
+        expect(feeReceived).to.equal(ethers.parseUnits("40", 18));
+        expect(userReceived).to.equal(ethers.parseUnits("360", 18));
+      });
+
+      it("should update redemption info correctly with custom price", async function () {
+        const { express, user1, user2, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 85000000n; // 0.85 * 1e8
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(0, price);
+
+        expect(await express.getRedemptionUserInfo(user1.address)).to.equal(0);
+        expect(await express.getRedemptionUserInfo(user2.address)).to.equal(0);
+      });
+
+      it("should emit events with correct data", async function () {
+        const { express, user1, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 95000000n; // 0.95 * 1e8
+
+        await expect(
+          express.connect(maintainer).processRedemptionQueueWithPrice(1, price),
+        ).to.emit(express, "ProcessRedeem");
+      });
+
+      it("should stop processing on insufficient liquidity with custom price", async function () {
+        const { express, usdo, operator, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 90000000n; // 0.9 * 1e8
+
+        // Transfer USDO out to create liquidity shortage
+        // With 0.9 price, we need 450 + 540 = 990 USDO for both redemptions
+        const expressBalance = await usdo.balanceOf(await express.getAddress());
+        await express
+          .connect(operator)
+          .offRamp(expressBalance - ethers.parseUnits("500", 18));
+
+        // Try to process all - should only process one
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(0, price);
+
+        // Queue should not be empty (one couldn't be processed)
+        expect(await express.getRedemptionQueueLength()).to.be.gt(0);
+      });
+
+      it("should process partial queue when some items lack liquidity", async function () {
+        const { express, usdo, operator, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 50000000n; // 0.5 * 1e8
+
+        // With 0.5 price, first redemption needs 250 USDO, second needs 300 USDO
+        const expressBalance = await usdo.balanceOf(await express.getAddress());
+        await express
+          .connect(operator)
+          .offRamp(expressBalance - ethers.parseUnits("270", 18));
+
+        // Should process first (250 USDO) but not second (needs 300 USDO)
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(0, price);
+
+        expect(await express.getRedemptionQueueLength()).to.equal(1);
+      });
+    });
+
+    describe("Failure Cases", function () {
+      it("should revert if price equals PRICE_BASE (1.0)", async function () {
+        const { express, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 100000000n; // 1.0 * 1e8 (PRICE_BASE)
+
+        await expect(
+          express.connect(maintainer).processRedemptionQueueWithPrice(1, price),
+        ).to.be.revertedWithCustomError(express, "InvalidAmount");
+      });
+
+      it("should revert if price is greater than PRICE_BASE", async function () {
+        const { express, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 150000000n; // 1.5 * 1e8
+
+        await expect(
+          express.connect(maintainer).processRedemptionQueueWithPrice(1, price),
+        ).to.be.revertedWithCustomError(express, "InvalidAmount");
+      });
+
+      it("should revert if called by non-maintainer (operator)", async function () {
+        const { express, operator } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 90000000n; // 0.9 * 1e8
+
+        await expect(
+          express.connect(operator).processRedemptionQueueWithPrice(1, price),
+        ).to.be.revertedWithCustomError(
+          express,
+          "AccessControlUnauthorizedAccount",
+        );
+      });
+
+      it("should revert if called by non-maintainer (user)", async function () {
+        const { express, user1 } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 90000000n; // 0.9 * 1e8
+
+        await expect(
+          express.connect(user1).processRedemptionQueueWithPrice(1, price),
+        ).to.be.revertedWithCustomError(
+          express,
+          "AccessControlUnauthorizedAccount",
+        );
+      });
+
+      it("should revert if queue is empty", async function () {
+        const { express, maintainer } = await loadFixture(deployFixture);
+
+        const price = 90000000n; // 0.9 * 1e8
+
+        await expect(
+          express.connect(maintainer).processRedemptionQueueWithPrice(1, price),
+        ).to.be.revertedWithCustomError(express, "EmptyQueue");
+      });
+
+      it("should revert if _len exceeds queue length", async function () {
+        const { express, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 90000000n; // 0.9 * 1e8
+
+        await expect(
+          express
+            .connect(maintainer)
+            .processRedemptionQueueWithPrice(10, price),
+        ).to.be.revertedWithCustomError(express, "InvalidInput");
+      });
+
+      it("should revert if user KYC revoked during processing", async function () {
+        const { express, user1, maintainer, whitelister } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 90000000n; // 0.9 * 1e8
+
+        // Revoke KYC
+        await express.connect(whitelister).revokeKycInBulk([user1.address]);
+
+        await expect(
+          express.connect(maintainer).processRedemptionQueueWithPrice(1, price),
+        ).to.be.revertedWithCustomError(express, "NotInKycList");
+      });
+
+      it("should revert with price = 0", async function () {
+        const { express, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 0n;
+
+        await expect(
+          express.connect(maintainer).processRedemptionQueueWithPrice(1, price),
+        ).to.be.revertedWithCustomError(express, "InvalidAmount");
+      });
+    });
+
+    describe("Edge Cases", function () {
+      it("should handle very small price correctly", async function () {
+        const { express, usdo, user1, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 100n; // 0.000001 * 1e8
+
+        const balanceBefore = await usdo.balanceOf(user1.address);
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+
+        const balanceAfter = await usdo.balanceOf(user1.address);
+        expect(balanceAfter).to.be.gt(balanceBefore);
+      });
+
+      it("should handle price just below PRICE_BASE", async function () {
+        const { express, usdo, user1, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        const price = 99999999n; // 0.99999999 * 1e8
+
+        const balanceBefore = await usdo.balanceOf(user1.address);
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+
+        const balanceAfter = await usdo.balanceOf(user1.address);
+        const received = balanceAfter - balanceBefore;
+
+        // Should be very close to 500 USDO
+        expect(received).to.be.closeTo(
+          ethers.parseUnits("500", 18),
+          ethers.parseUnits("1", 16),
+        );
+      });
+
+      it("should handle custom price with high fee rate", async function () {
+        const { express, usdo, user1, maintainer } = await loadFixture(
+          setupRedemptionQueueForPrice,
+        );
+
+        // Set 50% redeem fee
+        await express.connect(maintainer).updateRedeemFee(5000);
+
+        const price = 80000000n; // 0.8 * 1e8
+
+        const balanceBefore = await usdo.balanceOf(user1.address);
+
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+
+        const balanceAfter = await usdo.balanceOf(user1.address);
+        const received = balanceAfter - balanceBefore;
+
+        // 500 * 0.8 = 400, then 400 * 0.5 fee = 200, user gets 200
+        expect(received).to.equal(ethers.parseUnits("200", 18));
+      });
+
+      it("should work correctly when combined with normal processRedemptionQueue", async function () {
+        const {
+          express,
+          oem,
+          usdo,
+          user1,
+          user2,
+          user3,
+          operator,
+          maintainer,
+        } = await loadFixture(deployFixture);
+
+        // Setup - mint to 3 users
+        await express
+          .connect(user1)
+          .instantMint(
+            await usdo.getAddress(),
+            user1.address,
+            ethers.parseUnits("2000", 18),
+            0,
+          );
+        await express
+          .connect(user2)
+          .instantMint(
+            await usdo.getAddress(),
+            user2.address,
+            ethers.parseUnits("2000", 18),
+            0,
+          );
+        await express
+          .connect(user3)
+          .instantMint(
+            await usdo.getAddress(),
+            user3.address,
+            ethers.parseUnits("2000", 18),
+            0,
+          );
+
+        // Queue 3 redemptions
+        await oem
+          .connect(user1)
+          .approve(await express.getAddress(), ethers.parseUnits("500", 18));
+        await oem
+          .connect(user2)
+          .approve(await express.getAddress(), ethers.parseUnits("500", 18));
+        await oem
+          .connect(user3)
+          .approve(await express.getAddress(), ethers.parseUnits("500", 18));
+
+        await express
+          .connect(user1)
+          .redeemRequest(user1.address, ethers.parseUnits("500", 18));
+        await express
+          .connect(user2)
+          .redeemRequest(user2.address, ethers.parseUnits("500", 18));
+        await express
+          .connect(user3)
+          .redeemRequest(user3.address, ethers.parseUnits("500", 18));
+
+        expect(await express.getRedemptionQueueLength()).to.equal(3);
+
+        // Process first with custom price
+        const price = 80000000n; // 0.8 * 1e8
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+        expect(await express.getRedemptionQueueLength()).to.equal(2);
+
+        // Process second with normal price (1:1)
+        await express.connect(operator).processRedemptionQueue(1);
+        expect(await express.getRedemptionQueueLength()).to.equal(1);
+
+        // Process last with custom price
+        await express
+          .connect(maintainer)
+          .processRedemptionQueueWithPrice(1, price);
+        expect(await express.getRedemptionQueueLength()).to.equal(0);
+      });
+    });
+  });
+
   describe("Process Redemption Queue", function () {
     async function setupRedemptionQueue() {
       const fixture = await deployFixture();

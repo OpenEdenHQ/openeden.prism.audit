@@ -132,7 +132,8 @@ const config: HardhatUserConfig = {
       ...(PRIVATE_KEY ? { accounts: [PRIVATE_KEY] } : {}),
     },
     mainnet: {
-      url: QUICK_NODE_RPC || `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+      url:
+        QUICK_NODE_RPC || `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
       chainId: 1,
       ...(PRIVATE_KEY ? { accounts: [PRIVATE_KEY] } : {}),
     },
