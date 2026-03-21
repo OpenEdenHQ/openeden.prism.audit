@@ -90,6 +90,9 @@ contract Express is
     // Redemption queue
     DoubleQueueModified.BytesDeque private redemptionQueue;
 
+    // Escrow for cancelled redemptions that couldn't be refunded (e.g. banned sender)
+    mapping(address => uint256) public escrowBalance;
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -137,6 +140,8 @@ contract Express is
     event UpdateFirstDeposit(address indexed account, bool flag);
     event KycGranted(address[] addresses);
     event KycRevoked(address[] addresses);
+    event EscrowDeposit(address indexed account, uint256 amount);
+    event EscrowClaimed(address indexed account, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -540,12 +545,35 @@ contract Express is
                 --_len;
             }
 
-            // this is to refund the token to the sender
-            // even if the sender is not in the kyc list or in the ban list
-            token.burn(address(this), amount);
-            token.mint(sender, amount);
+            // Refund token to the sender. If transfer fails (e.g. sender is banned),
+            // park tokens in escrow for the sender to claim later when unbanned.
+            try IERC20(address(token)).transfer(sender, amount) returns (
+                bool success
+            ) {
+                if (!success) {
+                    escrowBalance[sender] += amount;
+                    emit EscrowDeposit(sender, amount);
+                }
+            } catch {
+                escrowBalance[sender] += amount;
+                emit EscrowDeposit(sender, amount);
+            }
+
             emit ProcessRedemptionCancel(sender, receiver, amount, prevId);
         }
+    }
+
+    /**
+     * @notice Claim escrowed tokens from cancelled redemptions that could not be refunded directly
+     * @dev Tokens are escrowed when cancel() cannot transfer back to the sender (e.g. sender was banned)
+     */
+    function claimEscrow() external {
+        uint256 amount = escrowBalance[msg.sender];
+        if (amount == 0) revert InvalidAmount();
+
+        escrowBalance[msg.sender] = 0;
+        IERC20(address(token)).safeTransfer(msg.sender, amount);
+        emit EscrowClaimed(msg.sender, amount);
     }
 
     /**
@@ -844,5 +872,5 @@ contract Express is
      * @dev Storage gap for future upgrades
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[45] private __gap;
+    uint256[44] private __gap;
 }

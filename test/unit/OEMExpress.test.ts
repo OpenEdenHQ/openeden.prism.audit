@@ -1713,6 +1713,193 @@ describe("Express", function () {
         express.connect(maintainer).cancel(10),
       ).to.be.revertedWithCustomError(express, "InvalidInput");
     });
+
+    describe("Escrow for banned senders", function () {
+      async function setupBannedSenderInQueue() {
+        const fixture = await deployFixture();
+        const { express, oem, usdo, user1, user2, admin, maintainer } = fixture;
+
+        // Grant BANLIST_ROLE to admin for banning
+        const BANLIST_ROLE = await oem.BANLIST_ROLE();
+        await oem.connect(admin).grantRole(BANLIST_ROLE, admin.address);
+
+        // Mint OEM to users via instantMint
+        await express
+          .connect(user1)
+          .instantMint(
+            await usdo.getAddress(),
+            user1.address,
+            ethers.parseUnits("2000", 18),
+            0,
+          );
+        await express
+          .connect(user2)
+          .instantMint(
+            await usdo.getAddress(),
+            user2.address,
+            ethers.parseUnits("2000", 18),
+            0,
+          );
+
+        // Approve and submit redeem requests
+        await oem
+          .connect(user1)
+          .approve(await express.getAddress(), ethers.parseUnits("1000", 18));
+        await oem
+          .connect(user2)
+          .approve(await express.getAddress(), ethers.parseUnits("1000", 18));
+
+        await express
+          .connect(user1)
+          .redeemRequest(user1.address, ethers.parseUnits("500", 18));
+        await express
+          .connect(user2)
+          .redeemRequest(user2.address, ethers.parseUnits("600", 18));
+
+        // Ban user1 after they submitted their redeem request
+        await oem.connect(admin).banAddresses([user1.address]);
+
+        return { ...fixture, BANLIST_ROLE };
+      }
+
+      it("should not revert cancel when sender is banned", async function () {
+        const { express, maintainer } = await loadFixture(
+          setupBannedSenderInQueue,
+        );
+
+        // cancel should succeed even though user1 is banned
+        await expect(express.connect(maintainer).cancel(1)).to.not.be.reverted;
+      });
+
+      it("should escrow tokens when transfer to banned sender fails", async function () {
+        const { express, user1, maintainer } = await loadFixture(
+          setupBannedSenderInQueue,
+        );
+
+        await express.connect(maintainer).cancel(1);
+
+        // Tokens should be in escrow, not transferred to banned user
+        expect(await express.escrowBalance(user1.address)).to.equal(
+          ethers.parseUnits("500", 18),
+        );
+      });
+
+      it("should emit EscrowDeposit when transfer fails", async function () {
+        const { express, user1, maintainer } = await loadFixture(
+          setupBannedSenderInQueue,
+        );
+
+        await expect(express.connect(maintainer).cancel(1))
+          .to.emit(express, "EscrowDeposit")
+          .withArgs(user1.address, ethers.parseUnits("500", 18));
+      });
+
+      it("should still process non-banned entries after banned entry via cancel", async function () {
+        const { express, oem, user2, maintainer } = await loadFixture(
+          setupBannedSenderInQueue,
+        );
+
+        const balanceBefore = await oem.balanceOf(user2.address);
+
+        // Cancel both entries - user1 (banned) goes to escrow, user2 (not banned) gets direct refund
+        await express.connect(maintainer).cancel(2);
+
+        expect(await express.getRedemptionQueueLength()).to.equal(0);
+        expect(await oem.balanceOf(user2.address)).to.equal(
+          balanceBefore + ethers.parseUnits("600", 18),
+        );
+      });
+
+      it("should allow banned user to claim escrow after being unbanned", async function () {
+        const { express, oem, user1, admin, maintainer } = await loadFixture(
+          setupBannedSenderInQueue,
+        );
+
+        // Cancel puts tokens in escrow
+        await express.connect(maintainer).cancel(1);
+        const balanceBefore = await oem.balanceOf(user1.address);
+
+        // Unban user1
+        await oem.connect(admin).unbanAddresses([user1.address]);
+
+        // Claim escrow
+        await express.connect(user1).claimEscrow();
+
+        expect(await oem.balanceOf(user1.address)).to.equal(
+          balanceBefore + ethers.parseUnits("500", 18),
+        );
+        expect(await express.escrowBalance(user1.address)).to.equal(0);
+      });
+
+      it("should emit EscrowClaimed when user claims escrow", async function () {
+        const { express, oem, user1, admin, maintainer } = await loadFixture(
+          setupBannedSenderInQueue,
+        );
+
+        await express.connect(maintainer).cancel(1);
+        await oem.connect(admin).unbanAddresses([user1.address]);
+
+        await expect(express.connect(user1).claimEscrow())
+          .to.emit(express, "EscrowClaimed")
+          .withArgs(user1.address, ethers.parseUnits("500", 18));
+      });
+
+      it("should revert claimEscrow if still banned", async function () {
+        const { express, user1, maintainer } = await loadFixture(
+          setupBannedSenderInQueue,
+        );
+
+        await express.connect(maintainer).cancel(1);
+
+        // user1 is still banned, safeTransfer will revert
+        await expect(express.connect(user1).claimEscrow()).to.be.reverted;
+      });
+
+      it("should revert claimEscrow if no escrow balance", async function () {
+        const { express, user2 } = await loadFixture(setupBannedSenderInQueue);
+
+        await expect(
+          express.connect(user2).claimEscrow(),
+        ).to.be.revertedWithCustomError(express, "InvalidAmount");
+      });
+
+      it("should accumulate escrow across multiple cancelled entries", async function () {
+        const fixture = await deployFixture();
+        const { express, oem, usdo, user1, admin, maintainer } = fixture;
+
+        const BANLIST_ROLE = await oem.BANLIST_ROLE();
+        await oem.connect(admin).grantRole(BANLIST_ROLE, admin.address);
+
+        // Mint and submit two redeem requests from user1
+        await express
+          .connect(user1)
+          .instantMint(
+            await usdo.getAddress(),
+            user1.address,
+            ethers.parseUnits("3000", 18),
+            0,
+          );
+        await oem
+          .connect(user1)
+          .approve(await express.getAddress(), ethers.parseUnits("2000", 18));
+        await express
+          .connect(user1)
+          .redeemRequest(user1.address, ethers.parseUnits("500", 18));
+        await express
+          .connect(user1)
+          .redeemRequest(user1.address, ethers.parseUnits("700", 18));
+
+        // Ban user1
+        await oem.connect(admin).banAddresses([user1.address]);
+
+        // Cancel both
+        await express.connect(maintainer).cancel(2);
+
+        expect(await express.escrowBalance(user1.address)).to.equal(
+          ethers.parseUnits("1200", 18),
+        );
+      });
+    });
   });
 
   describe("Configuration Management", function () {
