@@ -147,7 +147,6 @@ contract Express is
     error InvalidInput(uint256 input);
     error UpdateTooEarly(uint256 timestamp);
     error NotInKycList(address from, address to);
-    error BatchSizeTooLarge();
     error InsufficientLiquidity(uint256 required, uint256 available);
     error InsufficientOutput(uint256 received, uint256 minimum);
     error MintLessThanMinimum(uint256 amount, uint256 minimum);
