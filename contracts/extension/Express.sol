@@ -412,14 +412,23 @@ contract Express is
     /**
      * @notice Preview redemption amounts
      * @param _amount The amount of token to redeem
-     * @return feeAmt Platform fee amount in token
-     * @return redeemAmt token amount user receives
+     * @return feeAmt Platform fee amount in redeem token
+     * @return redeemAmt redeem token amount user receives
      */
     function previewRedeem(
         uint256 _amount
     ) public view returns (uint256 feeAmt, uint256 redeemAmt) {
-        feeAmt = txsFee(_amount, TxType.REDEEM);
-        redeemAmt = _amount - feeAmt;
+        return _previewRedeem(_amount, PRICE_BASE);
+    }
+
+    function _previewRedeem(
+        uint256 _amount,
+        uint256 _price
+    ) internal view returns (uint256 feeAmt, uint256 redeemAmt) {
+        uint256 underlyingAmt = convertToUnderlying(underlying, _amount)
+            .mulDiv(_price, PRICE_BASE);
+        feeAmt = txsFee(underlyingAmt, TxType.REDEEM);
+        redeemAmt = underlyingAmt - feeAmt;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -475,17 +484,13 @@ contract Express is
             if (!kycList[sender] || !kycList[receiver])
                 revert NotInKycList(sender, receiver);
 
-            uint256 underlyingAmt = convertToUnderlying(underlying, amount)
-                .mulDiv(_price, PRICE_BASE);
+            (uint256 feeAmt, uint256 receiveAmt) = _previewRedeem(amount, _price);
 
             uint256 availableLiquidity = getTokenBalance(address(underlying));
 
-            if (underlyingAmt > availableLiquidity) {
+            if ((receiveAmt + feeAmt) > availableLiquidity) {
                 break;
             }
-
-            uint256 feeAmt = txsFee(underlyingAmt, TxType.REDEEM);
-            uint256 receiveAmt = underlyingAmt - feeAmt;
 
             redemptionQueue.popFront();
 
