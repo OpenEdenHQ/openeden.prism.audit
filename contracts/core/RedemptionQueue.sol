@@ -149,7 +149,7 @@ contract RedemptionQueue is
      * @notice Get all pending redemptions for user (convenience function)
      * @param user User address
      * @return Array of all pending redemptions
-     * @dev Use getPendingRedemptions(user, start, count) for large lists
+     * @dev For large lists, consider calling getRedemption() individually
      */
     function getAllPendingRedemptions(
         address user
