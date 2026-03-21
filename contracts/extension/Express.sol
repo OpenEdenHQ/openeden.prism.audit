@@ -670,6 +670,16 @@ contract Express is
     }
 
     /**
+     * @notice Set redeem minimum amount (in token, 18 decimals)
+     * @param _redeemMinimum Minimum redeem amount
+     */
+    function setRedeemMinimum(
+        uint256 _redeemMinimum
+    ) external onlyRole(MAINTAINER_ROLE) {
+        _setRedeemMinimum(_redeemMinimum);
+    }
+
+    /**
      * @notice Set first deposit requirement amount (in token, 18 decimals)
      * @param _amount Required first deposit amount
      */
