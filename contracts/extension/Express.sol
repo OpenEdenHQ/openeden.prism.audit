@@ -531,7 +531,10 @@ contract Express is
                 --_len;
             }
 
-            IERC20(address(token)).safeTransfer(sender, amount);
+            // this is to refund the token to the sender
+            // even if the sender is not in the kyc list or in the ban list
+            token.burn(address(this), amount);
+            token.mint(sender, amount);
             emit ProcessRedemptionCancel(sender, receiver, amount, prevId);
         }
     }
