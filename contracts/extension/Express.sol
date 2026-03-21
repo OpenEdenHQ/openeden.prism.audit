@@ -425,8 +425,10 @@ contract Express is
         uint256 _amount,
         uint256 _price
     ) internal view returns (uint256 feeAmt, uint256 redeemAmt) {
-        uint256 underlyingAmt = convertToUnderlying(underlying, _amount)
-            .mulDiv(_price, PRICE_BASE);
+        uint256 underlyingAmt = convertToUnderlying(underlying, _amount).mulDiv(
+            _price,
+            PRICE_BASE
+        );
         feeAmt = txsFee(underlyingAmt, TxType.REDEEM);
         redeemAmt = underlyingAmt - feeAmt;
     }
@@ -484,7 +486,10 @@ contract Express is
             if (!kycList[sender] || !kycList[receiver])
                 revert NotInKycList(sender, receiver);
 
-            (uint256 feeAmt, uint256 receiveAmt) = _previewRedeem(amount, _price);
+            (uint256 feeAmt, uint256 receiveAmt) = _previewRedeem(
+                amount,
+                _price
+            );
 
             uint256 availableLiquidity = getTokenBalance(address(underlying));
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
 struct MintRedeemLimiterCfg {
     uint256 mintMinimum;
     uint256 redeemMinimum;
@@ -11,7 +13,7 @@ struct MintRedeemLimiterCfg {
  * @title MintRedeemLimiter
  * @notice contract implementing minimum thresholds for minting and redeeming.
  */
-abstract contract MintRedeemLimiter {
+abstract contract MintRedeemLimiter is Initializable {
     uint256 public _mintMinimum;
     uint256 public _redeemMinimum;
     uint256 public _firstDepositAmount;
@@ -32,7 +34,7 @@ abstract contract MintRedeemLimiter {
         uint256 mintMinimum,
         uint256 redeemMinimum,
         uint256 firstDepositAmount
-    ) internal {
+    ) internal onlyInitializing {
         _mintMinimum = mintMinimum;
         _redeemMinimum = redeemMinimum;
         _firstDepositAmount = firstDepositAmount;

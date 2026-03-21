@@ -218,7 +218,8 @@ contract Vault is
         address _user,
         uint256 _shares
     ) internal returns (uint256) {
-        if (lastActionBlock[msg.sender] == block.number) revert FlashLoanDetected();
+        if (lastActionBlock[msg.sender] == block.number)
+            revert FlashLoanDetected();
         lastActionBlock[msg.sender] = block.number;
 
         uint256 assets = super.redeem(_shares, redemptionQueue, _user);
