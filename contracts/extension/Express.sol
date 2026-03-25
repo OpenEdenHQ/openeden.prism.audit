@@ -545,18 +545,11 @@ contract Express is
                 --_len;
             }
 
-            // Refund token to the sender. If transfer fails (e.g. sender is banned),
-            // park tokens in escrow for the sender to claim later when unbanned.
-            try IERC20(address(token)).transfer(sender, amount) returns (
-                bool success
-            ) {
-                if (!success) {
+            if (token.isBanned(sender)) {
                     escrowBalance[sender] += amount;
                     emit EscrowDeposit(sender, amount);
-                }
-            } catch {
-                escrowBalance[sender] += amount;
-                emit EscrowDeposit(sender, amount);
+            } else {
+                IERC20(address(token)).safeTransfer(sender, amount);
             }
 
             emit ProcessRedemptionCancel(sender, receiver, amount, prevId);

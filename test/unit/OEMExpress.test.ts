@@ -1771,7 +1771,7 @@ describe("Express", function () {
         await expect(express.connect(maintainer).cancel(1)).to.not.be.reverted;
       });
 
-      it("should escrow tokens when transfer to banned sender fails", async function () {
+      it("should escrow tokens when sender is banned", async function () {
         const { express, user1, maintainer } = await loadFixture(
           setupBannedSenderInQueue,
         );
@@ -1784,7 +1784,7 @@ describe("Express", function () {
         );
       });
 
-      it("should emit EscrowDeposit when transfer fails", async function () {
+      it("should emit EscrowDeposit when sender is banned", async function () {
         const { express, user1, maintainer } = await loadFixture(
           setupBannedSenderInQueue,
         );
@@ -1861,6 +1861,37 @@ describe("Express", function () {
         await expect(
           express.connect(user2).claimEscrow(),
         ).to.be.revertedWithCustomError(express, "InvalidAmount");
+      });
+
+      it("should revert cancel when token is paused instead of escrowing", async function () {
+        const fixture = await deployFixture();
+        const { express, oem, usdo, user1, admin, maintainer } = fixture;
+
+        // Mint OEM to user1 via instantMint
+        await express
+          .connect(user1)
+          .instantMint(
+            await usdo.getAddress(),
+            user1.address,
+            ethers.parseUnits("2000", 18),
+            0,
+          );
+
+        // Approve and submit redeem request
+        await oem
+          .connect(user1)
+          .approve(await express.getAddress(), ethers.parseUnits("1000", 18));
+        await express
+          .connect(user1)
+          .redeemRequest(user1.address, ethers.parseUnits("500", 18));
+
+        // Pause the OEM token (not Express pause, but the underlying token)
+        const PAUSE_ROLE = await oem.PAUSE_ROLE();
+        await oem.connect(admin).grantRole(PAUSE_ROLE, admin.address);
+        await oem.connect(admin).pause();
+
+        // Cancel should revert because token is paused (not silently escrow)
+        await expect(express.connect(maintainer).cancel(1)).to.be.reverted;
       });
 
       it("should accumulate escrow across multiple cancelled entries", async function () {
