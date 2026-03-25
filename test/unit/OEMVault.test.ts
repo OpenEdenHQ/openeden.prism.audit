@@ -985,6 +985,83 @@ describe("OEMVault", function () {
       // In production, if two transactions are in the same block, the second would revert
       // with FlashLoanDetected error. The protection mechanism is verified in the contract code.
     });
+
+    it("should propagate lastActionBlock to recipient on share transfer", async function () {
+      const { vault, oem, user1, user2, minter } =
+        await loadFixture(deployFixture);
+
+      const stakeAmount = ethers.parseUnits("1000", 18);
+      await oem.connect(minter).mint(user1.address, stakeAmount);
+      await oem.connect(user1).approve(await vault.getAddress(), stakeAmount);
+
+      // Disable auto-mining and interval mining to batch txs in one block
+      await ethers.provider.send("evm_setAutomine", [false]);
+      await ethers.provider.send("evm_setIntervalMining", [0]);
+
+      // Block N: user1 stakes → lastActionBlock[user1] = N
+      await vault.connect(user1).stake(stakeAmount, 0);
+      // Block N: user1 transfers shares to user2 → propagates lastActionBlock[user2] = N
+      await vault.connect(user1).transfer(user2.address, stakeAmount);
+      // Block N: user2 tries to unstake → lastActionBlock[user2] == N → REVERT
+      const unstakeResponse = await vault.connect(user2).unstake(stakeAmount);
+
+      await ethers.provider.send("evm_mine", []);
+      await ethers.provider.send("evm_setAutomine", [true]);
+
+      await expect(unstakeResponse.wait()).to.be.rejected;
+    });
+
+    it("should not propagate lastActionBlock when recipient has a higher block", async function () {
+      const { vault, oem, user1, user2, minter } =
+        await loadFixture(deployFixture);
+
+      const stakeAmount = ethers.parseUnits("1000", 18);
+      await oem.connect(minter).mint(user1.address, stakeAmount);
+      await oem.connect(minter).mint(user2.address, stakeAmount);
+      await oem.connect(user1).approve(await vault.getAddress(), stakeAmount);
+      await oem.connect(user2).approve(await vault.getAddress(), stakeAmount);
+
+      // user2 stakes first (sets lastActionBlock[user2])
+      await vault.connect(user2).stake(stakeAmount, 0);
+
+      // user1 stakes in a later block
+      await vault.connect(user1).stake(stakeAmount, 0);
+
+      // user1 transfers some shares to user2 in a later block
+      const transferAmount = ethers.parseUnits("100", 18);
+      await vault.connect(user1).transfer(user2.address, transferAmount);
+
+      // user2 should be able to unstake in a subsequent block (no propagation issue)
+      const user2Shares = await vault.balanceOf(user2.address);
+      await expect(vault.connect(user2).unstake(user2Shares)).to.not.be
+        .reverted;
+    });
+
+    it("should prevent flash loan bypass via transfer to fresh address", async function () {
+      const { vault, oem, user1, user2, minter } =
+        await loadFixture(deployFixture);
+
+      const stakeAmount = ethers.parseUnits("1000", 18);
+      await oem.connect(minter).mint(user1.address, stakeAmount);
+      await oem.connect(user1).approve(await vault.getAddress(), stakeAmount);
+
+      // Disable auto-mining and interval mining to batch txs in one block
+      await ethers.provider.send("evm_setAutomine", [false]);
+      await ethers.provider.send("evm_setIntervalMining", [0]);
+
+      // Block N: user1 stakes
+      await vault.connect(user1).stake(stakeAmount, 0);
+      // Block N: user1 transfers all shares to user2 (fresh address)
+      await vault.connect(user1).transfer(user2.address, stakeAmount);
+      // Block N: user2 tries to unstake — blocked by propagated lastActionBlock
+      const unstakeResponse = await vault.connect(user2).unstake(stakeAmount);
+
+      await ethers.provider.send("evm_mine", []);
+      await ethers.provider.send("evm_setAutomine", [true]);
+
+      // Unstake tx should have reverted in the mined block
+      await expect(unstakeResponse.wait()).to.be.rejected;
+    });
   });
 
   describe("Edge Cases & Boundary Conditions", function () {

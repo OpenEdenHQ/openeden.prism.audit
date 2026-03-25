@@ -197,6 +197,10 @@ contract Vault is
         }
         if (to != address(0)) {
             if (IToken(asset()).isBanned(to)) revert BannedAddress(to);
+            // Propagate flash-loan block guard to recipient
+            if (lastActionBlock[from] > lastActionBlock[to]) {
+                lastActionBlock[to] = lastActionBlock[from];
+            }
         }
 
         if (paused()) revert VaultPausedTransfers();
