@@ -150,9 +150,7 @@ contract Express is
     error InvalidAddress();
     error InvalidAmount();
     error InvalidInput(uint256 input);
-    error UpdateTooEarly(uint256 timestamp);
     error NotInKycList(address from, address to);
-    error InsufficientLiquidity(uint256 required, uint256 available);
     error InsufficientOutput(uint256 received, uint256 minimum);
     error MintLessThanMinimum(uint256 amount, uint256 minimum);
     error FirstDepositLessThanRequired(uint256 amount, uint256 minimum);
@@ -546,8 +544,8 @@ contract Express is
             }
 
             if (token.isBanned(sender)) {
-                    escrowBalance[sender] += amount;
-                    emit EscrowDeposit(sender, amount);
+                escrowBalance[sender] += amount;
+                emit EscrowDeposit(sender, amount);
             } else {
                 IERC20(address(token)).safeTransfer(sender, amount);
             }
