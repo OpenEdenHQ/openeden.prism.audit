@@ -37,15 +37,14 @@ contract Vault is
     error UseStakeInstead();
     error UseUnstakeInstead();
     error VaultPausedTransfers();
-    error FlashLoanDetected();
     error InsufficientOutput(uint256 received, uint256 minimum);
 
     bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
     bytes32 public constant UPGRADE_ROLE = keccak256("UPGRADE_ROLE");
     address public redemptionQueue;
 
-    // Flash loan protection: track last action block per user
-    mapping(address => uint256) private lastActionBlock;
+    /// @dev Reserved slot — previously `lastActionBlock` (deployed on mainnet)
+    mapping(address => uint256) private __deprecated_lastActionBlock;
 
     event Staked(address indexed user, uint256 amount, uint256 shares);
     event UnstakeRequested(
@@ -197,10 +196,6 @@ contract Vault is
         }
         if (to != address(0)) {
             if (IToken(asset()).isBanned(to)) revert BannedAddress(to);
-            // Propagate flash-loan block guard to recipient
-            if (lastActionBlock[from] > lastActionBlock[to]) {
-                lastActionBlock[to] = lastActionBlock[from];
-            }
         }
 
         if (paused()) revert VaultPausedTransfers();
@@ -208,11 +203,6 @@ contract Vault is
     }
 
     function _stake(address _user, uint256 _amount) internal returns (uint256) {
-        address sender = msg.sender;
-
-        if (lastActionBlock[sender] == block.number) revert FlashLoanDetected();
-        lastActionBlock[sender] = block.number;
-
         uint256 shares = super.deposit(_amount, _user);
         emit Staked(_user, _amount, shares);
         return shares;
@@ -222,10 +212,6 @@ contract Vault is
         address _user,
         uint256 _shares
     ) internal returns (uint256) {
-        if (lastActionBlock[msg.sender] == block.number)
-            revert FlashLoanDetected();
-        lastActionBlock[msg.sender] = block.number;
-
         uint256 assets = super.redeem(_shares, redemptionQueue, _user);
 
         uint256 redemptionId = IRedemptionQueue(redemptionQueue).enqueue(
