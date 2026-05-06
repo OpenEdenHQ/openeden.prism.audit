@@ -25,9 +25,7 @@ describe("Express - requestDirectRedeem", function () {
   }
 
   // Arbitrary "RLUSD" address — informational only; contract never calls it
-  const RLUSD = ethers.getAddress(
-    "0x000000000000000000000000000000000000cafe",
-  );
+  const RLUSD = ethers.getAddress("0x000000000000000000000000000000000000cafe");
 
   describe("happy path", function () {
     it("burns tokens immediately and emits event", async function () {
