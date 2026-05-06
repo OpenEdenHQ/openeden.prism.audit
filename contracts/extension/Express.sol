@@ -120,6 +120,14 @@ contract Express is
         bytes32 indexed id
     );
 
+    // Event for off-chain redeem (direct burn, off-chain settlement in arbitrary asset)
+    event OffchainRedeem(
+        address indexed from,
+        address indexed to,
+        address indexed asset,
+        uint256 tokenAmount
+    );
+
     event ProcessRedeem(
         address indexed from,
         address indexed to,
@@ -155,6 +163,7 @@ contract Express is
     error MintLessThanMinimum(uint256 amount, uint256 minimum);
     error FirstDepositLessThanRequired(uint256 amount, uint256 minimum);
     error EmptyQueue();
+    error UnderlyingNotAllowed();
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
