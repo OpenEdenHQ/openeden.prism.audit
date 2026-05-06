@@ -136,4 +136,73 @@ describe("Express - requestDirectRedeem", function () {
       ).to.be.reverted;
     });
   });
+
+  describe("coexistence with queued flow", function () {
+    it("interleaves with instantMint and redeemRequest without drift", async function () {
+      const { express, oem, usdo, user1, user2, operator } =
+        await loadFixture(deployWithMint);
+
+      // user2 mints PRISM
+      const mintAmt = ethers.parseUnits("5000", 18);
+      await express
+        .connect(user2)
+        .instantMint(await usdo.getAddress(), user2.address, mintAmt, 0);
+      await oem
+        .connect(user2)
+        .approve(await express.getAddress(), ethers.MaxUint256);
+
+      const supplyAfterMint = await oem.totalSupply();
+
+      // user1 direct-redeems
+      await express
+        .connect(user1)
+        .requestDirectRedeem(
+          RLUSD,
+          ethers.parseUnits("1000", 18),
+          user1.address,
+        );
+
+      // Total supply drops by 1000 (immediate burn)
+      expect(await oem.totalSupply()).to.equal(
+        supplyAfterMint - ethers.parseUnits("1000", 18),
+      );
+      // Redemption queue is unaffected
+      expect(await express.getRedemptionQueueLength()).to.equal(0n);
+
+      // user2 queued-redeems
+      await express
+        .connect(user2)
+        .redeemRequest(user2.address, ethers.parseUnits("500", 18));
+
+      // Queue length now 1; total supply still only reflects user1's burn
+      // (user2's tokens are escrowed in Express, not yet burned).
+      expect(await express.getRedemptionQueueLength()).to.equal(1n);
+      expect(await oem.totalSupply()).to.equal(
+        supplyAfterMint - ethers.parseUnits("1000", 18),
+      );
+
+      // user1 direct-redeems again
+      await express
+        .connect(user1)
+        .requestDirectRedeem(
+          RLUSD,
+          ethers.parseUnits("300", 18),
+          user1.address,
+        );
+
+      // Direct redeem doesn't touch the queue
+      expect(await express.getRedemptionQueueLength()).to.equal(1n);
+      expect(await oem.totalSupply()).to.equal(
+        supplyAfterMint - ethers.parseUnits("1300", 18),
+      );
+
+      // Process the queued redeem — this burns user2's 500 and pays out USDO
+      await express.connect(operator).processRedemptionQueue(0);
+
+      expect(await express.getRedemptionQueueLength()).to.equal(0n);
+      expect(await oem.totalSupply()).to.equal(
+        supplyAfterMint - ethers.parseUnits("1800", 18),
+      );
+    });
+  });
 });
