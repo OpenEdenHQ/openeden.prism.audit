@@ -421,6 +421,33 @@ contract Express is
     }
 
     /**
+     * @notice Redeem PRISM tokens with off-chain settlement in an arbitrary asset.
+     * @dev Burns tokens immediately. The settlement payout is handled fully off-chain;
+     *      the contract only emits the burn record for the DB to match against.
+     *      No queue, no on-chain fee, no T+N delay; fees are applied off-chain at
+     *      settlement time. Express must hold BURNER_ROLE on the Token contract.
+     * @param _asset Informational asset address the user wants to receive off-chain
+     *               (e.g. RLUSD). Must be non-zero and not equal to underlying.
+     * @param _amount PRISM token amount to burn.
+     * @param _to KYC'd recipient address recorded for off-chain settlement.
+     */
+    function requestDirectRedeem(
+        address _asset,
+        uint256 _amount,
+        address _to
+    ) external whenNotPausedRedeem {
+        address from = _msgSender();
+        if (!kycList[from] || !kycList[_to]) revert NotInKycList(from, _to);
+        if (_amount == 0) revert InvalidAmount();
+        if (_asset == address(0)) revert InvalidAddress();
+        if (_asset == underlying) revert UnderlyingNotAllowed();
+
+        token.burn(from, _amount);
+
+        emit OffchainRedeem(from, _to, _asset, _amount);
+    }
+
+    /**
      * @notice Preview redemption amounts
      * @param _amount The amount of token to redeem
      * @return feeAmt Platform fee amount in redeem token
