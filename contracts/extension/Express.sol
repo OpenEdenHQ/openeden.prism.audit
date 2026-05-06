@@ -121,11 +121,15 @@ contract Express is
     );
 
     // Event for off-chain redeem (direct burn, off-chain settlement in arbitrary asset)
+    // feeAmt is informational: the protocol's posted redeemFeeRate applied to _amount
+    // at burn time, denominated in underlying. The off-chain DB has final say on
+    // settlement fee in the requested asset.
     event OffchainRedeem(
         address indexed from,
         address indexed to,
         address indexed asset,
-        uint256 tokenAmount
+        uint256 tokenAmount,
+        uint256 feeAmt
     );
 
     event ProcessRedeem(
@@ -424,8 +428,14 @@ contract Express is
      * @notice Redeem PRISM tokens with off-chain settlement in an arbitrary asset.
      * @dev Burns tokens immediately. The settlement payout is handled fully off-chain;
      *      the contract only emits the burn record for the DB to match against.
-     *      No queue, no on-chain fee, no T+N delay; fees are applied off-chain at
-     *      settlement time. Express must hold BURNER_ROLE on the Token contract.
+     *      No queue, no on-chain fee transfer, no T+N delay. Express must hold
+     *      BURNER_ROLE on the Token contract.
+     *
+     *      The emitted `feeAmt` is informational: it reflects the protocol's posted
+     *      redeemFeeRate applied to `_amount` (denominated in underlying, assuming
+     *      1:1) at burn time. No fee tokens are transferred on-chain; off-chain ops
+     *      may use this as a hint when computing the final payout in the requested
+     *      asset, but the off-chain DB has final say.
      * @param _asset Informational asset address the user wants to receive off-chain
      *               (e.g. RLUSD). Must be non-zero and not equal to underlying.
      * @param _amount PRISM token amount to burn.
@@ -442,9 +452,11 @@ contract Express is
         if (_asset == address(0)) revert InvalidAddress();
         if (_asset == underlying) revert UnderlyingNotAllowed();
 
+        (uint256 feeAmt, ) = previewRedeem(_amount);
+
         token.burn(from, _amount);
 
-        emit OffchainRedeem(from, _to, _asset, _amount);
+        emit OffchainRedeem(from, _to, _asset, _amount, feeAmt);
     }
 
     /**

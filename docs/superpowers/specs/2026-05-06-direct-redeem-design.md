@@ -85,8 +85,9 @@ No `_redeemMinimum` check (off-chain settlement may have different economics).
 ## Body
 
 ```solidity
+(uint256 feeAmt, ) = previewRedeem(_amount);
 token.burn(from, _amount);
-emit OffchainRedeem(from, _to, _asset, _amount);
+emit OffchainRedeem(from, _to, _asset, _amount, feeAmt);
 ```
 
 No state mutations. No escrow. No queue. The burn relies on Express's pre-existing `BURNER_ROLE` on the Token contract.
@@ -98,7 +99,8 @@ event OffchainRedeem(
     address indexed from,
     address indexed to,
     address indexed asset,
-    uint256 tokenAmount
+    uint256 tokenAmount,
+    uint256 feeAmt
 );
 ```
 
@@ -154,3 +156,4 @@ Total: 9 tests.
 | 4 | Fee/burn | No on-chain fee, direct `token.burn(from, amount)` | No state to maintain; saves transfer gas; Express has BURNER_ROLE |
 | 5 | Naming | `requestDirectRedeem` / `OffchainRedeem` | Matches HYBOND for cross-contract symmetry |
 | 6 | Event payload | 4 fields (no `shareAmount`) | Prism has no shares; carrying useless field forever isn't worth one-time decoder cost |
+| 7 | Fee field | Informational `feeAmt` from previewRedeem | Off-chain DB has final say; on-chain hint helps reconciliation without enforcing |

@@ -343,7 +343,7 @@ Separate from vault redemption queue:
 3. PRISM burned, USDO transferred to user (minus fees)
 4. Admin can cancel requests and refund PRISM if needed
 
-**Off-chain direct redeem flow (`requestDirectRedeem`):** user picks an arbitrary settlement asset (e.g. RLUSD) by address, PRISM tokens are burned immediately on-chain via `token.burn`, and `OffchainRedeem` is emitted. No queue, no on-chain fee, no oracle — the back-office DB matches the event and pays out off-chain in the requested asset. Rejects `_asset == 0` and `_asset == underlying` (the latter forces the standard asset through `redeemRequest`'s queued path).
+**Off-chain direct redeem flow (`requestDirectRedeem`):** user picks an arbitrary settlement asset (e.g. RLUSD) by address, PRISM tokens are burned immediately on-chain via `token.burn`, and `OffchainRedeem(from, to, asset, tokenAmount, feeAmt)` is emitted. The `feeAmt` is informational — computed via `previewRedeem` at burn time as a hint for off-chain ops; no fee tokens move on-chain. The back-office DB matches the event and pays out in the requested asset. Rejects `_asset == 0` and `_asset == underlying` (the latter forces the standard asset through `redeemRequest`'s queued path).
 
 ### Ban List Enforcement
 

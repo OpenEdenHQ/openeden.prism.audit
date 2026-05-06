@@ -35,18 +35,39 @@ describe("Express - requestDirectRedeem", function () {
       const supplyBefore = await oem.totalSupply();
       const userBalBefore = await oem.balanceOf(user1.address);
 
+      const [expectedFee] = await express.previewRedeem(tokenAmount);
+
       await expect(
         express
           .connect(user1)
           .requestDirectRedeem(RLUSD, tokenAmount, user1.address),
       )
         .to.emit(express, "OffchainRedeem")
-        .withArgs(user1.address, user1.address, RLUSD, tokenAmount);
+        .withArgs(user1.address, user1.address, RLUSD, tokenAmount, expectedFee);
 
       expect(await oem.totalSupply()).to.equal(supplyBefore - tokenAmount);
       expect(await oem.balanceOf(user1.address)).to.equal(
         userBalBefore - tokenAmount,
       );
+    });
+
+    it("emits feeAmt matching previewRedeem after fee rate change", async function () {
+      const { express, maintainer, user1 } = await loadFixture(deployWithMint);
+
+      // Set a non-zero redeem fee (50 bps = 0.5%)
+      await express.connect(maintainer).updateRedeemFee(50);
+
+      const tokenAmount = ethers.parseUnits("1000", 18);
+      const [expectedFee] = await express.previewRedeem(tokenAmount);
+      expect(expectedFee).to.be.gt(0n);
+
+      await expect(
+        express
+          .connect(user1)
+          .requestDirectRedeem(RLUSD, tokenAmount, user1.address),
+      )
+        .to.emit(express, "OffchainRedeem")
+        .withArgs(user1.address, user1.address, RLUSD, tokenAmount, expectedFee);
     });
   });
 
