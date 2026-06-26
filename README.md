@@ -1,8 +1,19 @@
 # PRISM Contracts
 
-Smart contracts for the PRISM staking protocol: the PRISM token, the xPRISM ERC4626 vault, the Express deposit/redeem gateway with KYC, an asset registry, and a T+N redemption queue. Contracts are UUPS-upgradeable and built with Hardhat.
+Smart contracts for the PRISM staking protocol. Contracts are UUPS-upgradeable and built with Hardhat.
 
-Deployed addresses are listed in [`deployed-addresses.md`](./deployed-addresses.md).
+## Contracts
+
+- `Token` — the PRISM token
+- `Vault` — the xPRISM ERC4626 staking vault
+- `RedemptionQueue` — T+N unstaking queue
+- `Express` — deposit/redeem gateway with KYC and limits
+- `AssetRegistry` — supported-asset configuration and price feeds
+- `MintRedeemLimiter` — per-operation deposit/redeem limits
+
+## Deployed Addresses
+
+Deployed contract addresses for all networks (mainnet + testnet) are in [`deployed-addresses.md`](./deployed-addresses.md).
 
 ## Development
 
@@ -19,6 +30,10 @@ npm run test
 # format
 npm run format
 ```
+
+## Audits
+
+Independent security audit reports are in [`audits/`](./audits/).
 
 ## Attribution
 
