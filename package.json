@@ -1,64 +1,30 @@
 {
-  "name": "openeden-oem-contract",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "prism-contracts",
+  "license": "MIT",
   "scripts": {
+    "clean": "hardhat clean",
+    "compile": "hardhat compile",
     "test": "hardhat test",
     "test:unit": "hardhat test test/unit/**/*.test.ts",
     "test:integration": "hardhat test test/integration/**/*.test.ts",
-    "test:usdox": "hardhat test test/unit/USDOX.test.ts",
-    "test:vault": "hardhat test test/unit/USDOXVault.test.ts",
-    "test:queue": "hardhat test test/unit/RedemptionQueue.test.ts",
-    "test:fuzz": "hardhat test test/unit/FuzzTests.test.ts",
-    "test:invariants": "hardhat test test/unit/Invariants.test.ts",
     "coverage": "hardhat coverage",
-    "coverage:unit": "hardhat coverage --testfiles 'test/unit/**/*.test.ts'",
-    "compile": "hardhat compile",
-    "clean": "hardhat clean",
-    "node": "hardhat node",
-    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
-    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
-    "gas-report": "REPORT_GAS=true hardhat test",
-    "typechain": "hardhat typechain",
-    "format": "prettier --write 'contracts/**/*.sol' 'test/**/*.ts' '*.ts'",
-    "format:check": "prettier --check 'contracts/**/*.sol' 'test/**/*.ts' '*.ts'",
-    "prepare": "husky"
+    "size": "hardhat size-contracts",
+    "format": "prettier --write 'contracts/**/*.sol' 'test/**/*.ts' '*.ts'"
   },
-  "lint-staged": {
-    "*.sol": "prettier --write",
-    "*.ts": "prettier --write",
-    "*.js": "prettier --write"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^3.1.2",
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
-    "@typechain/hardhat": "^9.1.0",
     "@types/node": "^24.10.1",
     "ethers": "^6.15.0",
     "hardhat": "^2.27.1",
     "hardhat-contract-sizer": "^2.10.1",
-    "hardhat-deploy": "^0.12.4",
-    "hardhat-deploy-ethers": "^0.4.2",
-    "hardhat-gas-reporter": "^2.3.0",
-    "hardhat-storage-layout": "^0.1.7",
-    "husky": "^9.0.11",
-    "lint-staged": "^15.2.0",
     "prettier": "^3.3.3",
     "prettier-plugin-solidity": "^1.4.1",
-    "solidity-coverage": "^0.8.16",
     "ts-node": "^10.9.2",
-    "typechain": "^8.3.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@chainlink/contracts": "^1.4.0",
-    "@openzeppelin/contracts": "^5.4.0",
-    "@openzeppelin/contracts-upgradeable": "^5.4.0",
-    "dotenv": "^17.2.3"
+    "@openzeppelin/contracts": "5.4.0",
+    "@openzeppelin/contracts-upgradeable": "5.4.0"
   }
 }

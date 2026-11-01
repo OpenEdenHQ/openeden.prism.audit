@@ -120,21 +120,6 @@ contract Express is
         bytes32 indexed id
     );
 
-    // Event for off-chain redeem (direct burn, off-chain settlement in arbitrary asset)
-    // amount: PRISM tokens burned (gross).
-    // receiveAmt: net underlying the user would receive at 1:1 settlement after fee
-    //             (informational, derived from previewRedeem).
-    // feeAmt: fee portion at the protocol's posted redeemFeeRate at burn time
-    //         (informational; the off-chain DB has final say in the requested asset).
-    event OffchainRedeem(
-        address indexed from,
-        address indexed to,
-        address indexed asset,
-        uint256 amount,
-        uint256 receiveAmt,
-        uint256 feeAmt
-    );
-
     event ProcessRedeem(
         address indexed from,
         address indexed to,
@@ -170,7 +155,6 @@ contract Express is
     error MintLessThanMinimum(uint256 amount, uint256 minimum);
     error FirstDepositLessThanRequired(uint256 amount, uint256 minimum);
     error EmptyQueue();
-    error UnderlyingNotAllowed();
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -425,42 +409,6 @@ contract Express is
         redemptionQueue.pushBack(data);
 
         emit AddToRedemptionQueue(from, _to, _amount, id);
-    }
-
-    /**
-     * @notice Redeem PRISM tokens with off-chain settlement in an arbitrary asset.
-     * @dev Burns tokens immediately. The settlement payout is handled fully off-chain;
-     *      the contract only emits the burn record for the DB to match against.
-     *      No queue, no on-chain fee transfer, no T+N delay. Express must hold
-     *      BURNER_ROLE on the Token contract.
-     *
-     *      Emitted `receiveAmt` and `feeAmt` are informational, derived from
-     *      `previewRedeem(_amount)` at burn time. They reflect the protocol's posted
-     *      redeemFeeRate against `_amount` denominated in `underlying` (assuming 1:1).
-     *      No fee tokens are transferred on-chain; off-chain ops may use these as
-     *      hints when computing the final payout in the requested asset, but the
-     *      off-chain DB has final say.
-     * @param _asset Informational asset address the user wants to receive off-chain
-     *               (e.g. RLUSD). Must be non-zero and not equal to underlying.
-     * @param _amount PRISM token amount to burn.
-     * @param _to KYC'd recipient address recorded for off-chain settlement.
-     */
-    function requestDirectRedeem(
-        address _asset,
-        uint256 _amount,
-        address _to
-    ) external whenNotPausedRedeem {
-        address from = _msgSender();
-        if (!kycList[from] || !kycList[_to]) revert NotInKycList(from, _to);
-        if (_amount == 0) revert InvalidAmount();
-        if (_asset == address(0)) revert InvalidAddress();
-        if (_asset == underlying) revert UnderlyingNotAllowed();
-
-        (uint256 feeAmt, uint256 receiveAmt) = previewRedeem(_amount);
-
-        token.burn(from, _amount);
-
-        emit OffchainRedeem(from, _to, _asset, _amount, receiveAmt, feeAmt);
     }
 
     /**
